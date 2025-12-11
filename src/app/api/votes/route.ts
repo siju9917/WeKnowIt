@@ -7,11 +7,12 @@ const DEMO_USER_ID = 1;
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as any;
-    const targetType = (body.targetType as string | undefined) ?? "";
+    const rawTargetType = (body.targetType as string | undefined) ?? "";
     const targetId = Number(body.targetId);
     const value = Number(body.value); // should be 1 or -1
 
-    if (!["knowledge_item"].includes(targetType)) {
+    // For now we only support knowledge_item as a target
+    if (rawTargetType !== "knowledge_item") {
       return NextResponse.json(
         {
           error: {
@@ -22,6 +23,9 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Narrow to the literal type "knowledge_item"
+    const targetType = "knowledge_item" as const;
 
     if (!targetId || Number.isNaN(targetId)) {
       return NextResponse.json(
@@ -62,22 +66,20 @@ export async function POST(req: NextRequest) {
     });
 
     // Recompute cachedVoteScore for knowledge item
-    if (targetType === "knowledge_item") {
-      const agg = await prisma.vote.aggregate({
-        _sum: { value: true },
-        where: {
-          targetType: "knowledge_item",
-          targetId,
-        },
-      });
+    const agg = await prisma.vote.aggregate({
+      _sum: { value: true },
+      where: {
+        targetType: "knowledge_item",
+        targetId,
+      },
+    });
 
-      const sum = agg._sum.value ?? 0;
+    const sum = agg._sum.value ?? 0;
 
-      await prisma.knowledgeItem.update({
-        where: { id: targetId },
-        data: { cachedVoteScore: sum },
-      });
-    }
+    await prisma.knowledgeItem.update({
+      where: { id: targetId },
+      data: { cachedVoteScore: sum },
+    });
 
     return NextResponse.json({ vote }, { status: 200 });
   } catch (err) {
