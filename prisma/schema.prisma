@@ -1,0 +1,165 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum KnowledgeItemType {
+  comment
+  paper
+  url
+  dataset
+  note
+  other
+}
+
+enum KnowledgeItemStatus {
+  pending
+  ingested
+  rejected
+}
+
+enum VoteTargetType {
+  knowledge_item
+  knowledge_chunk
+  response_source
+}
+
+enum MessageSenderType {
+  user
+  llm
+}
+
+model User {
+  id          Int      @id @default(autoincrement())
+  email       String   @unique
+  username    String?  @unique
+  displayName String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  threads       Thread[]
+  knowledge     KnowledgeItem[]
+  conversations Conversation[]
+  messages      Message[]
+  votes         Vote[]
+}
+
+model LLMConfig {
+  id            Int      @id @default(autoincrement())
+  baseModelName String
+  systemPrompt  String
+  temperature   Float    @default(0.2)
+  maxTokens     Int?
+  retrievalK    Int      @default(8)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  threads Thread[]
+}
+
+model Thread {
+  id              Int      @id @default(autoincrement())
+  slug            String   @unique
+  title           String
+  description     String?
+  createdByUserId Int
+  llmConfigId     Int
+  isPublic        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  createdBy User      @relation(fields: [createdByUserId], references: [id])
+  llmConfig LLMConfig @relation(fields: [llmConfigId], references: [id])
+
+  knowledgeItems  KnowledgeItem[]
+  conversations   Conversation[]
+  knowledgeChunks KnowledgeChunk[]
+}
+
+model KnowledgeItem {
+  id              Int                 @id @default(autoincrement())
+  threadId        Int
+  type            KnowledgeItemType   @default(comment)
+  title           String?
+  rawContent      String?
+  sourceUrl       String?
+  metadata        Json                @default("{}")
+  addedByUserId   Int
+  status          KnowledgeItemStatus @default(pending)
+  cachedVoteScore Int                 @default(0)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  thread  Thread           @relation(fields: [threadId], references: [id])
+  addedBy User             @relation(fields: [addedByUserId], references: [id])
+  chunks  KnowledgeChunk[]
+  sources ResponseSource[]
+}
+
+model KnowledgeChunk {
+  id              Int      @id @default(autoincrement())
+  knowledgeItemId Int
+  threadId        Int
+  chunkIndex      Int
+  text            String
+  embedding       Float[] // we'll store embeddings as float array
+  qualityScore    Float    @default(0)
+  createdAt       DateTime @default(now())
+
+  knowledgeItem KnowledgeItem @relation(fields: [knowledgeItemId], references: [id])
+  thread        Thread        @relation(fields: [threadId], references: [id])
+}
+
+model Vote {
+  id         Int            @id @default(autoincrement())
+  userId     Int
+  targetType VoteTargetType
+  targetId   Int
+  value      Int
+  createdAt  DateTime       @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, targetType, targetId])
+}
+
+model Conversation {
+  id              Int      @id @default(autoincrement())
+  threadId        Int
+  startedByUserId Int
+  title           String?
+  createdAt       DateTime @default(now())
+
+  thread    Thread    @relation(fields: [threadId], references: [id])
+  startedBy User      @relation(fields: [startedByUserId], references: [id])
+  messages  Message[]
+}
+
+model Message {
+  id             Int               @id @default(autoincrement())
+  conversationId Int
+  senderType     MessageSenderType
+  senderUserId   Int?
+  content        String
+  createdAt      DateTime          @default(now())
+
+  conversation Conversation     @relation(fields: [conversationId], references: [id])
+  sender       User?            @relation(fields: [senderUserId], references: [id])
+  sources      ResponseSource[]
+}
+
+model ResponseSource {
+  id               Int      @id @default(autoincrement())
+  messageId        Int
+  knowledgeItemId  Int
+  knowledgeChunkId Int?
+  score            Float?
+  rank             Int?
+  createdAt        DateTime @default(now())
+
+  message       Message       @relation(fields: [messageId], references: [id])
+  knowledgeItem KnowledgeItem @relation(fields: [knowledgeItemId], references: [id])
+}
