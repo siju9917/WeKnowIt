@@ -29,7 +29,7 @@ export async function ingestKnowledgeItem(item: KnowledgeItemLike) {
   const texts = chunks.map((c) => c.text);
   const embeddings = await embedTexts(texts);
 
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: any) => {
     await tx.knowledgeChunk.createMany({
       data: chunks.map((chunk, idx) => ({
         knowledgeItemId: item.id,
@@ -46,3 +46,4 @@ export async function ingestKnowledgeItem(item: KnowledgeItemLike) {
     });
   });
 }
+
