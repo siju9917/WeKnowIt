@@ -4,7 +4,7 @@ import { prisma } from "../../../lib/prisma";
 
 const DEMO_USER_ID = 1;
 
-// List threads
+// GET /api/threads - list threads
 export async function GET(_req: NextRequest) {
   try {
     const threads = await prisma.thread.findMany({
@@ -12,23 +12,30 @@ export async function GET(_req: NextRequest) {
     });
 
     return NextResponse.json({ threads }, { status: 200 });
-  } catch (err) {
+  } catch (err: any) {
     console.error("Error in GET /api/threads:", err);
     return NextResponse.json(
-      { error: { code: "INTERNAL_ERROR", message: "Something went wrong." } },
+      {
+        error: {
+          code: "INTERNAL_ERROR",
+          message:
+            err?.message || "Something went wrong when loading threads.",
+        },
+      },
       { status: 500 }
     );
   }
 }
 
-// Create a new thread
+// POST /api/threads - create a new thread
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as any;
     const title = (body.title as string | undefined)?.trim();
-    const description = (body.description as string | undefined)?.trim() ?? "";
-    const baseModelName = (body.baseModelName as string | undefined)?.trim() ||
-      "gpt-4.1-mini";
+    const description =
+      (body.description as string | undefined)?.trim() ?? "";
+    const baseModelName =
+      (body.baseModelName as string | undefined)?.trim() || "gpt-4.1-mini";
 
     if (!title) {
       return NextResponse.json(
@@ -42,7 +49,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Simple slug generator
+    // simple slug
     const baseSlug = title
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
@@ -50,7 +57,7 @@ export async function POST(req: NextRequest) {
     let slug = baseSlug || "thread";
     let suffix = 1;
 
-    // Ensure slug is unique
+    // ensure slug is unique
     // eslint-disable-next-line no-constant-condition
     while (true) {
       const existing = await prisma.thread.findUnique({ where: { slug } });
@@ -60,7 +67,6 @@ export async function POST(req: NextRequest) {
 
     const systemPrompt = `You are an expert assistant for the thread "${title}". Answer questions specifically in this domain, using the thread's knowledge base when available. Be concise but precise.`;
 
-    // Create LLMConfig and Thread
     const llmConfig = await prisma.lLMConfig.create({
       data: {
         baseModelName,
@@ -82,17 +88,16 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ thread }, { status: 201 });
   } catch (err: any) {
-  console.error("Error in POST /api/threads:", err);
-  return NextResponse.json(
-    {
-      error: {
-        code: "INTERNAL_ERROR",
-        message:
-          err?.message ||
-          err?.code ||
-          "Something went wrong on the server.",
+    console.error("Error in POST /api/threads:", err);
+    return NextResponse.json(
+      {
+        error: {
+          code: "INTERNAL_ERROR",
+          message:
+            err?.message || "Something went wrong when creating thread.",
+        },
       },
-    },
-    { status: 500 }
-  );
+      { status: 500 }
+    );
+  }
 }
