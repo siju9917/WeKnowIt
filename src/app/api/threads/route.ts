@@ -81,12 +81,18 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ thread }, { status: 201 });
-  } catch (err) {
-    console.error("Error in POST /api/threads:", err);
-    return NextResponse.json(
-      { error: { code: "INTERNAL_ERROR", message: "Something went wrong." } },
-      { status: 500 }
-    );
-  }
+  } catch (err: any) {
+  console.error("Error in POST /api/threads:", err);
+  return NextResponse.json(
+    {
+      error: {
+        code: "INTERNAL_ERROR",
+        message:
+          err?.message ||
+          err?.code ||
+          "Something went wrong on the server.",
+      },
+    },
+    { status: 500 }
+  );
 }
-
